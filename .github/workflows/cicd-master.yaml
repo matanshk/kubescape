@@ -1,0 +1,122 @@
+name: kubescape-cicd
+on:
+  pull_request:
+    types: [closed]
+    branches: [ master ]
+    
+  # push:
+  #   branches: [ master ]
+  #   paths-ignore:
+  #     # Do not run the pipeline if only Markdown files changed
+  #     - '**/**.md' ### Do not run the workflow if Mardown files changed.
+  #     - '.github/workflows/*' ### Do not run the workflow if files under path: .github/workflows/* changed.
+
+jobs:
+
+  docker-build:
+    if: ${{ (github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'master') }} ## Trigger if the the PR merged to master branch
+    uses: ./.github/workflows/ks-docker-build.yaml 
+    with:
+      IMAGE_NAME: quay.io/kubescape/kubescape # ### quay.io/${{ github.repository_owner }}/kubescape
+      IMAGE_TAG: v2.0.${{ github.run_number }}
+      COMPONENT_NAME: kubescape
+      CGO_ENABLED: 0
+      GO111MODULE: ""
+      GO_VERSION: "1.18"
+      EVENT_NAME: ${{ github.event_name }} 
+      BUILD_PLATFORM: linux/amd64 #linux/amd64,linux/arm64
+      # IMAGE_TESTS: '[-
+      #                 "scan_nsa"
+      #               ]'      
+      IMAGE_TESTS:  '[
+                      "ks_microservice_ns_creation",
+                      "ks_microservice_on_demand",
+                      "ks_microservice_mitre_framework_on_demand",
+                      "ks_microservice_nsa_and_mitre_framework_demand",
+                      "ks_microservice_triggering_with_cron_job",
+                      "ks_microservice_update_cronjob_schedule",
+                      "ks_microservice_delete_cronjob",
+                      "ks_microservice_create_2_cronjob_mitre_and_nsa"
+                    ]'   
+      COSIGN: true
+    secrets: inherit
+
+  binary-build:
+    if: ${{ (github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'master') }} ## Trigger if the the PR merged to master branch
+    uses: ./.github/workflows/ks-binary-build.yaml #matanshk/workflows/.github/workflows/ks-build-dev.yaml@main
+    with:
+      COMPONENT_NAME: kubescape
+      CGO_ENABLED: 0
+      GO111MODULE: ""
+      GO_VERSION: "1.18"
+      EVENT_NAME: ${{ github.event_name }} 
+      # BINARY_TESTS: '[
+      #                 "scan_nsa"
+      #               ]'
+      BINARY_TESTS: '[
+                      "scan_nsa",                                                                                            
+                      "scan_mitre",                                                                                          
+                      "scan_with_exceptions",                                                                                
+                      "scan_repository",                                                                                     
+                      "scan_local_file",                                                                                     
+                      "scan_local_glob_files",                                                                               
+                      "scan_local_list_of_files",                                                                            
+                      "scan_nsa_and_submit_to_backend",                                                                      
+                      "scan_mitre_and_submit_to_backend",                                                                    
+                      "scan_local_repository_and_submit_to_backend",                                                         
+                      "scan_repository_from_url_and_submit_to_backend",                                                      
+                      "scan_with_exception_to_backend",                                                                      
+                      "scan_with_custom_framework",                                                                                                                                                               
+                      "scan_customer_configuration",                                                                         
+                      "host_scanner"
+                    ]'
+    secrets: inherit
+
+
+  create-release:
+    needs: [docker-build, binary-build]
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'release') && always() && contains(needs.*.result, 'success') && !(contains(needs.*.result, 'failure')) && !(contains (needs.*.result,'cancelled')) }} ## run only if tagged as "release"
+    uses: ./.github/workflows/ks-create-release.yaml
+    with:
+      RELEASE_NAME: "Release v2.0.${{ github.run_number }}"
+      TAG_NAME: "v2.0.${{ github.run_number }}"
+      DRAFT: true
+    secrets: inherit    
+
+  docker-retag:
+    needs: [docker-build, create-release]
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'release') && always() && contains(needs.*.result, 'success') && !(contains(needs.*.result, 'failure')) && !(contains (needs.*.result,'cancelled')) }} ## run only if tagged as "release"
+    uses: ./.github/workflows/ks-docker-retag.yaml
+    with:
+      IMAGE_NAME: quay.io/kubescape/kubescape
+      IMAGE_TAG_PRERELEASE: ${{ needs.docker-build.outputs.IMAGE_TAG_PRERELEASE }}
+      IMAGE_TAG: "v2.0.${{ github.run_number }}"
+      COSIGN: true
+    secrets: inherit   
+
+  trigger-helm-cicd:
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'release') && always() && contains(needs.*.result, 'success') && !(contains(needs.*.result, 'failure')) && !(contains (needs.*.result,'cancelled')) }} ## run only if tagged as "release"
+    needs: docker-retag #publish-artifacts
+    uses: ./.github/workflows/ks-trigger-helm-workflow.yaml
+    with:
+      IMAGE_TAG: v2.0.${{ github.run_number }}
+      COMPONENT_NAME: kubescape
+      HELM_E2E_TEST: true
+    secrets: inherit
+
+
+  abort-on-failure-docker-build:
+    needs: docker-build
+    if: ${{ always() && (contains(needs.*.result, 'failure')) && !contains(needs.*.result, 'success') && !(contains (needs.*.result,'cancelled')) }} ## Abroat the workflow if one of the jobs failed
+    runs-on: ubuntu-latest
+    steps:
+    - name: cancelling
+      uses: andymckay/cancel-action@0.3
+
+  abort-on-failure-binary-build:
+    needs: binary-build
+    if: ${{ always() && (contains(needs.*.result, 'failure')) && !contains(needs.*.result, 'success') && !(contains (needs.*.result,'cancelled')) }} ## Abroat the workflow if one of the jobs failed
+    runs-on: ubuntu-latest
+    steps:
+    - name: cancelling
+      uses: andymckay/cancel-action@0.3

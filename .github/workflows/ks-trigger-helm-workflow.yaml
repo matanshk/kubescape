@@ -1,0 +1,36 @@
+name: ks-trigger-helm-workflow
+on:
+  workflow_call:
+    inputs:
+      IMAGE_TAG:
+        required: true
+        type: string
+        default: "v2.0.${{ github.run_number }}"
+      COMPONENT_NAME:
+        required: true
+        type: string
+        default: kubescape
+      HELM_E2E_TEST:
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  trigger-helm-cicd:
+    name: trigger-helm-cicd
+    runs-on: ubuntu-latest  
+    steps:
+      - name: Trigger helm chart workflow
+        uses: convictional/trigger-workflow-and-wait@v1.6.5
+        with:
+          owner: ${{ github.repository_owner }}
+          repo: helm-charts
+          github_token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          github_user: matanshk # will change to kubescape
+          workflow_file_name: 00-cicd.yaml
+          ref: dev
+          wait_interval: 10
+          client_payload: '{"IMAGE_TAG":"${{ inputs.IMAGE_TAG }}","COMPONENT_NAME":"${{ inputs.COMPONENT_NAME }}","HELM_E2E_TEST":"${{ inputs.HELM_E2E_TEST }}"}'
+          propagate_failure: true
+          trigger_workflow: true
+          wait_workflow: true
