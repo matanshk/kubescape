@@ -1,4 +1,4 @@
-name: code-review-approved-gate-wf
+name: y-code-review-approved-gate-wf
 on:
   pull_request_review:
     types: [submitted]

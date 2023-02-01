@@ -2,7 +2,7 @@ name: 01-code_review_approved
 
 on:
   workflow_run:
-    workflows: ["code-review-approved-gate-wf"]
+    workflows: ["y-code-review-approved-gate-wf"]
     types: [completed]
     branches: 
       - master
