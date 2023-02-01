@@ -14,6 +14,7 @@ name: 01-code_review_approved
 #       - 'docs/*'
 #       - 'build/*'
 #       - '.github/*'
+
 on:
   workflow_run:
     workflows: ["code-review-approved-gate-wf"]
@@ -35,9 +36,11 @@ jobs:
         run: echo "$GITHUB_CONTEXT"
 
   binary-build:
-    if: ${{ github.event.review.state == 'approved' && 
-            contains( github.event.pull_request.labels.*.name, 'trigger-integration-test') && 
-            github.event.pull_request.base.ref == 'master' }} ## run only if labeled as "trigger-integration-test" and base branch is master
+    if: ${{ github.event.pull_request.base.ref == 'master' }} ## run only if base branch is master
+
+    # if: ${{ github.event.review.state == 'approved' && 
+    #         contains( github.event.pull_request.labels.*.name, 'trigger-integration-test') && 
+    #         github.event.pull_request.base.ref == 'master' }} ## run only if labeled as "trigger-integration-test" and base branch is master
     uses: ./.github/workflows/b-binary-build-and-e2e-tests.yaml
     with:
       COMPONENT_NAME: kubescape
@@ -53,8 +56,11 @@ jobs:
     needs: binary-build
     env:
       GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-    if: ${{ (github.event.review.state == 'approved' && github.event.pull_request.base.ref == 'master') && 
+    if: ${{ github.event.pull_request.base.ref == 'master' && 
             (always() && (contains(needs.*.result, 'success') || contains(needs.*.result, 'skipped')) && !(contains(needs.*.result, 'failure')) && !(contains(needs.*.result, 'cancelled'))) }}
+
+    # if: ${{ (github.event.review.state == 'approved' && github.event.pull_request.base.ref == 'master') && 
+            # (always() && (contains(needs.*.result, 'success') || contains(needs.*.result, 'skipped')) && !(contains(needs.*.result, 'failure')) && !(contains(needs.*.result, 'cancelled'))) }}
     runs-on: ubuntu-latest
     steps:
       - name: merge-to-master
