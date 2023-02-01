@@ -1,26 +1,38 @@
 name: 01-code_review_approved
+# on:
+#   pull_request_review:
+#     types: [submitted]
+#     branches:
+#       - 'master'
+#       - 'main'
+#     paths-ignore:
+#       - '**.yaml'
+#       - '**.md'
+#       - '**.sh'
+#       - 'website/*'
+#       - 'examples/*'
+#       - 'docs/*'
+#       - 'build/*'
+#       - '.github/*'
 on:
-  pull_request_review:
-    types: [submitted]
-    branches:
-      - 'master'
-      - 'main'
-    paths-ignore:
-      - '**.yaml'
-      - '**.md'
-      - '**.sh'
-      - 'website/*'
-      - 'examples/*'
-      - 'docs/*'
-      - 'build/*'
-      - '.github/*'
-
+  workflow_run:
+    workflows: ["code-review-approved-gate-wf"]
+    types:
+      - completed
 
 concurrency:
   group: code-review-approved
   cancel-in-progress: true
 
 jobs:
+  echo-context:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Dump GitHub context
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: echo "$GITHUB_CONTEXT"
 
   binary-build:
     if: ${{ github.event.review.state == 'approved' && 
@@ -55,3 +67,6 @@ jobs:
           MERGE_METHOD: "merge"
           MERGE_LABELS: ""
           UPDATE_LABELS: ""
+
+
+          

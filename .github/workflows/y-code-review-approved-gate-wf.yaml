@@ -1,0 +1,32 @@
+name: code-review-approved-gate-wf
+on:
+  pull_request_review:
+    types: [submitted]
+    branches:
+      - 'master'
+      - 'main'
+    paths-ignore:
+      - '**.yaml'
+      - '**.md'
+      - '**.sh'
+      - 'website/*'
+      - 'examples/*'
+      - 'docs/*'
+      - 'build/*'
+      - '.github/*'
+
+
+jobs:
+  trigger-gate:
+    if: ${{ github.event.review.state == 'approved' && 
+            contains( github.event.pull_request.labels.*.name, 'trigger-integration-test') && 
+            github.event.pull_request.base.ref == 'master' }} 
+    runs-on: ubuntu-latest
+    steps:
+      - name: trigger workflow_run
+        run: echo "trigger workflow_run -> code-review-approved-gate-wf"
+
+      - name: Dump GitHub context
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: echo "$GITHUB_CONTEXT"
