@@ -19,14 +19,8 @@ on:
 jobs:
   trigger-gate:
     if: ${{ github.event.review.state == 'approved' && 
-            contains( github.event.pull_request.labels.*.name, 'trigger-integration-test') && 
-            github.event.pull_request.base.ref == 'master' }} 
+            (github.event.pull_request.base.ref == 'master' || github.event.pull_request.base.ref == 'main') }} ## triggers only if code review approved an
     runs-on: ubuntu-latest
     steps:
       - name: trigger workflow_run
         run: echo "trigger workflow_run -> code-review-approved-gate-wf"
-
-      - name: Dump GitHub context
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
-        run: echo "$GITHUB_CONTEXT"
